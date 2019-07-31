@@ -36,16 +36,251 @@ public static MyInterface getMyInterfaceInstance() {
 static factory メソッドやコンストラクタは多数のオプショナル引数に対してうまくスケーリングができない。この節では telescoping constructor パターンと JavaBeans パターンと比較しながら、両方の長所を持つ Builder パターンについて紹介する。
 
 ### telescoping constructor パターン
+```java
+public class NutritionFacts {
+  private final int servingSize;   // required
+  private final int servings;      // required
+  private final int calories;      // optional
+  private final int fat;           // optional
+  private final int sodium;        // optional 
+  private final int carbohydrate;  // optional
+
+  public NutritionFacts(int servingSize, int servings) {
+    this(servingSize, servings, 0);
+  }
+
+  public NutritionFacts(int servingSize, int servings, int calories) {
+    this(servingSize, servings, calories, 0);
+  }
+
+  public NutritionFacts(int servingSize, int servings, int calories, int fat) {
+    this(servingSize, servings, calories, fat, 0);
+  }
+
+  public NutritionFacts(int servingSize, int servings, int calories, int fat, int sodium) {
+    this(servingSize, servings, calories, fat, sodium, 0);
+  }
+
+  public NutritionFacts(int servingSize, int servings, int calories, int fat, int sodium, int carbohydrate) {
+    this.servingSize = servingSize;
+    this.servings = servings;
+    this.calories = calories;
+    this.fat = fat;
+    this.sodium = sodium;
+    this.carbohydrate = carbohydrate;
+  }
+}
+```
+```java
+// 使用例
+NutritionFacts cocaCola = new NutritionFacts(240, 8, 0, 35, 27);
+```
+- オプショナル引数の数だけコンストラクタを用意する
+- 与えたい引数を持つオプショナル引数の数が最小のコンストラクタでインスタンスを生成する
+  - fat の値のみを渡したい場合は上から 2 番目のコンストラクタ
+- 引数に渡す必要のないものは結局 0 のような値を渡さないといけない
+- **オプショナル引数が多いと書きにくくなる**
+- **何番目の引数が何の値なのかわからない**
 
 ### JavaBeans パターン
+```java
+public class NutritionFacts {
+  private int servingSize = -1; // required
+  private int servings = -1; // required
+  private int calories = 0;
+  private int fat = 0;
+  private int sodium = 0;
+  private int carbohydrate = 0;
+
+  public NutritionFacts() { }
+
+  public void setServingSize(int val) { servingSize = val; }
+  public void setServings(int val) { servings = val; }
+  public void setCalories(int val) { calories = val; }
+  public void setFat(int val) { fat = val; }
+  public void setSodium(int val) { sodium = val; }
+  public void setCarbohydrate(int val) { carbohydrate = val; }
+}
+```
+```java
+// 使用例
+NutritionFacts cocaCola = new NutritionFacts();
+cocaCola.setServingSize(240);
+cocaCola.setServings(8);
+cocaCola.setCalories(100);
+cocaCola.setSodium(35);
+cocaCola.setCarbohydrate(27);
+```
+- **整合性が保てない**
+  - 値がきちんとセットされていない状態でインスタンスが生成される
+- **immutable (Item 17) にできない**
+  - final じゃない (セッターから値が変えられる)
+  - スレッドセーフにするために余計な手間が発生する
+
 
 ### Builder パターン
+```java
+public class NutritionFacts {
+  private final int servingSize;
+  private final int servings;
+  private final int calories;
+  private final int fat;
+  private final int sodium;
+  private final int carbohydrate;
 
+  public static class Builder {
+    // required
+    private final int servingSize;
+    private final int servings;
+
+    // optional
+    private int calories = 0;
+    private int fat = 0;
+    private int sodium = 0;
+    private int carbohydrate = 0;
+
+    public Builder(int servingSize, int servings) {
+      this.servingSize = servingSize;
+      this.servings = servings;
+    }
+
+    public Builder calories(int val) {
+      calories = val;
+      return this;
+    }
+
+    public Builder fat(int val) {
+      fat = val;
+      return this;
+    }
+
+    public Builder sodium(int val) {
+      sodium = val;
+      return this;
+    }
+
+    public Builder carbohydrate(int val) {
+      carbohydrate = val;
+      return this;
+    }
+
+    public NutritionFacts build() {
+      return new NutritionFacts(this);
+    }
+  }
+
+  private NutritionFacts(Builder builder) {
+    servingSize = builder.servingSize;
+    servings = builder.servings;
+    calories = builder.alories;
+    fat = builder.fat;
+    sodium = builder.sodium;
+    carbohydrate = builder.carbohydrate;
+  }
+}
+```
+```java
+NutritionFacts cocaCola = new NutritionFacts.Builder(240, 8)
+                            .calories(100)
+                            .sodium(35)
+                            .carbohydrate(27)
+                            .build();
+```
+- **書くのも読むのも容易**
+  - telescoping constructor パターンの欠点改善
+- オプショナル引数の全ての組み合わせでインスタンスが生成できる
+- 引数のバリデーションが可能
+- たくさんの引数を持つ時に向いてる
+- 階層構造を持つクラスでも使える
+
+```java
+public abstract class Pizza {
+  public enum Topping { HAM, MUSHROOM, ONION, PEPPER, SAUSAGE }
+  final Set<Topping> toppings;
+
+  abstract static class Builder<T extends Builder<T>> {
+    EnumSet<Topping> toppings = EnumSet.noneOf(Topping.class);
+    public T addTopping(Topping topping) {
+      toppings.add(Objects.requireNonNull(topping));
+      return self();
+    }
+
+    abstract Pizza build();
+
+    protected abstract T self();
+  }
+
+  Pizza(Builder<?> builder) {
+    toppings = builder.toppings.clone(); // Item 50
+  }
+}
+```
+```java
+public class NyPizza extends Pizza {
+  public enum Size { SMALL, MEDIUM, LARGE }
+  private final Size size;
+
+  public static class Builder extends Pizza.Builder<Builder> {
+    private final Size size;
+
+    public Builder(Size size) {
+      this.size = Objects.requireNonNull(size);
+    }
+
+    @Override public NyPizza build() {
+      return new NyPizza(this);
+    }
+
+    @Override protected Builder self() { return this; }
+  }
+
+  private NyPizza(Builder builder) {
+    super(builder);
+    size = builder.size;
+  }
+}
+```
+```java
+public class Calzone extends Pizza {
+  private final boolean sauceInside;
+
+  public static class Builder extends Pizza.Builder<Builder> {
+    private boolean sauceInside = false;
+
+    public Builder sauceInside() {
+      sauceInside = true;
+      return this;
+    }
+
+    @Override public Calzone build() {
+      return new Calzone(this);
+    }
+
+    @Override protected Builder self() { return this; }
+  }
+
+  private Calzone(Builder builder) {
+    super(builder);
+    sauceInside = builder.sauceInside;
+  }
+}
+```
+```java
+// 使用例
+NyPizza pizza = new NyPizza.Builder(SMALL)
+                  .addTopping(SAUSAGE)
+                  .addTopping(ONION)
+                  .build();
+Calzone calzone = new Calzone.Builder()
+                  .addTopping(HAM)
+                  .sauceInside()
+                  .build();
+```
 
 ## Item 3: Enforce the singleton property with a private constructor or an enum type
 
 ### まえおき
-ただ一度だけのインスタンス生成が保証される singleton はモックにすることが不可能なためテストが困難であるという特徴を持つ。その singleton を実現するための方法について紹介する。
+ただ一度だけのインスタンス生成が保証される singleton は**モックにすることが不可能なためテストが困難である**という特徴を持つ。その singleton を実現するための方法について紹介する。
 
 ### public static final フィールドを提供する
 ```java
@@ -77,8 +312,10 @@ public class Elvis {
 - static factory メソッドの処理を変えるだけで singleton じゃなくすることもできる柔軟性を持つ
 - generic singleton factory (Item 30) を書ける
 - method reference を supplier として使える
-
-// TODO: Serializable についてきちんと書く？
+- serializable (Chapter 12) 可能にしたい場合、ただ implements Serializable すればいいという話ではない
+  - 全てのフィールドを transient 宣言しシリアライズの対象外とする
+  - readResolve メソッド (Item 89) で元のインスタンスを返すようにする
+  - デシリアライズするたびに新しいインスタンスが生成されて singleton が保証されない
 
 
 ### 単一要素を持つ enum で宣言する
@@ -89,14 +326,28 @@ public enum Elvis {
   public void leaveTheBuilding() { ... }
 }
 ```
-- singleton が単一のインスタンスであることが保証される
-  - リフレクションや直列化による攻撃の心配もない
+- singleton が保証される
+  - リフレクションやシリアライズによる攻撃の心配もない
 - Enum 以外のスーパクラスを継承している場合はダメ
-- 一番いいのでは？
+- **一番いいのでは？**
+
 
 ## Item 4: Enforce noninstantiability with a private constructor
 
 ### まえおき
+インスタンス生成を想定しないユーティリティクラスなどは**抽象化するだけではインスタンス生成は防げない**。これは結局、抽象クラスを継承したサブクラスからインスタンスを生成することができしまう。この節ではこのようなクラスのインスタンス生成を防ぐための方法を紹介する。
+
+### private コンストラクタを宣言する
+```java
+public class UtilityClass {
+  private UtilityClass() {
+    throw new AssertionError();
+  }
+}
+```
+- **private コンストラクタを宣言する**
+  - コンストラクタを宣言しないと、デフォルトコンストラクタが呼ばれてしまう
+- 例外を投げることによって、間違えてクラス内部でコンストラクタを読んだ時にも対処
 
 
 ## Item 5: Prefer dependency injection to hardwiring resources
