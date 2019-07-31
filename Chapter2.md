@@ -353,7 +353,55 @@ public class UtilityClass {
 ## Item 5: Prefer dependency injection to hardwiring resources
 
 ### まえおき
+クラスは複数の資源 (クラス) に依存していることが多い。これらの資源をクラスに直接持たせることは柔軟性に欠けてテストが困難になる。この節では dependency injection (依存性注入) による依存資源の提供方法について紹介する。
 
+### 柔軟性のない実装
+```java
+// static ユーティリティクラス (Item 4)
+public class SpellChecker {
+  private static final Lexicon dictionary = ...;
+  
+  private SpellChecker() {}
+
+  public static boolean isValid(String word) { ... }
+  public static List<String> suggestions(String typo) { ... }
+}
+```
+```java
+// singleton (Item 3)
+public class SpellChecker {
+  private final Lexicon dictionary = ...;
+
+  private SpellChecker(...) {}
+  public static INSTANCE = new SpellChecker(...);
+
+  public boolean isValid(String word) { ... }
+  public List<String> suggestions(String typo) { ... }
+}
+```
+- **SpellChecker を実現するための辞書が一つしか存在しなく、柔軟性がない**
+  - 辞書は英語や日本語のように複数考えられる
+  - 日本語辞書を持っている時は英語の SpellCheck はできない (テストも落ちる)
+
+### dependency injection (依存性注入) による実装
+```java
+public class SpellChecker {
+  private final Lexicon dictionary;
+
+  public SpellChecker(Lexicon dictionary) {
+    this.dictionary = Objects.requireNonNull(dictionary);
+  }
+
+  public boolean isValid(String word) { ... }
+  public List<String> suggestions(String typo) { ... }
+}
+```
+- インスタンスを生成する時に依存資源を渡す
+- 知らずにみんなやってるけど、これを依存性注入って言うんだよ！
+- 依存する資源を共有できる
+- 大きなプロジェクトだとごちゃごちゃしちゃう
+  - 多数の資源が依存し合ってる
+  - 依存性注入フレームワーク (Dagger, Guice, Spring) を使うと解決できる
 
 ## Item 6: Avoid creating unnecessary objects
 
