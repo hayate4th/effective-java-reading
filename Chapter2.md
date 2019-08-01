@@ -517,7 +517,7 @@ public Object pop() {
 ※ Java9 では finalizer は deprecated だがライブラリでまだ使われている
 
 ### finalizer と cleaner のデメリット
-#### いつ呼ばれるかがわからなし、必ず呼ばれるとも限らない
+#### 1. いつ呼ばれるかがわからなし、必ず呼ばれるとも限らない
 - finalize() や clean() は GC が行われる時に呼ばれる
   - そもそもいつ GC が行われるのかわからない
   - GC のタイミングも制御できない
@@ -533,10 +533,10 @@ public class Teenager {
 ```
 - Peace out! のあとに Cleaning room. が出力されて欲しかった
 
-#### ひどくパフォーマンスが落ちる
+#### 2. ひどくパフォーマンスが落ちる
 - finalizer や cleaner は GC をとてつもなく非効率化する
 
-#### ファイナライザには脆弱性がある
+#### 3. ファイナライザには脆弱性がある
 ```java
 public class Zombie {
   static Zombie zombie;
