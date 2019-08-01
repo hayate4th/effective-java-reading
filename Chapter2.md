@@ -403,10 +403,57 @@ public class SpellChecker {
   - 多数の資源が依存し合ってる
   - 依存性注入フレームワーク (Dagger, Guice, Spring) を使うと解決できる
 
+
 ## Item 6: Avoid creating unnecessary objects
 
-### まえおき
+### 不必要なインスタンスは生成しない
+```java
+// ダメな例
+String s = new String("bikini"); // DON'T DO THIS!
+```
+```java
+// いい例
+String s = "bikini";
+```
+- ループとかで回した時、上は毎回インスタンスを生成する
+  - 下は単一の String インスタンスを参照する
 
+```java
+static boolean isRomanNumeral(String s) {
+  return s.matches("^(?=.)M*(C[MD]|D?C{0,3})" + "(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})$");
+}
+```
+```java
+public class RomanNumerals {
+  private static final Pattern ROMAN = Pattern.compile("^(?=.)M*(C[MD]|D?C{0,3})" + "(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})$");
+
+  static boolean isRomanNumeral(String s) {
+    return ROMAN.matcher(s).matches();
+  }
+}
+```
+- 上の書き方だと内部で Pattern インスタンスを一度生成して、GC にすぐ回収される
+  - 何度も同じ条件でやる場合は勿体無い
+  - 生成した Pattern インスタンスをキャッシュする
+- 下の場合だと isRomanNumeral が使われなかったら Pattern インスタンスは無駄になる
+  - lazily initializing (Item 83) で isRomanNumeral が初めて呼ばれた時にインスタンスを生成する
+
+```java
+Long hoge = 0L; // 自動ボクシング (型変換)
+long fuga = hoge; // 自動アンボクシング (型変換)
+```
+```java
+private static long sum() {
+  Long sum = 0L; // ココ！
+  for (long i = 0; i <= Integer.MAX_VALUE; i++)
+    sum += i; // 自動ボクシングが起きる
+  
+  return sum;
+}
+```
+- 2の31乗個の無駄なインスタンスが生成される
+  - Long → long にする
+- 基本データ型を使って自動ボクシングには気をつける
 
 ## Item 7: Eliminate obsolete object references
 
