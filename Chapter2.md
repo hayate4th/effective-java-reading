@@ -434,8 +434,8 @@ public class RomanNumerals {
 ```
 - 上の書き方だと内部で Pattern インスタンスを一度生成して、GC にすぐ回収される
   - 何度も同じ条件でやる場合は勿体無い
-  - 生成した Pattern インスタンスをキャッシュする
 - 下の場合だと isRomanNumeral が使われなかったら Pattern インスタンスは無駄になる
+  - 生成した Pattern インスタンスをキャッシュする
   - lazily initializing (Item 83) で isRomanNumeral が初めて呼ばれた時にインスタンスを生成する
 
 ```java
