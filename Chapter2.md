@@ -457,7 +457,57 @@ private static long sum() {
 
 ## Item 7: Eliminate obsolete object references
 
-### まえおき
+### 廃れた参照は消そう
+```java
+public class Stack {
+  private Object[] elements;
+  private int size = 0;
+  private static final int DEFAULT_INITIAL_CAPACITY = 16;
+
+  public Stack() {
+    elements = new Object[DEFAULT_INITIAL_CAPACITY];
+  }
+
+  public void push(Object e) {
+    ensureCapacity();
+    elements[size++] = e;
+  }
+
+  public Object pop() {
+    if (size == 0)
+      throw new EmptyStackException();
+    return elements[--size]; // ココ！
+  }
+
+  private void ensureCapacity() {
+    if (elements.length == size)
+      elements = Arrays.copyOf(elements, 2 * size + 1);
+  }
+}
+```
+- pop した時に elements[size] の参照が返ってくるが、elements 自身がelements[size] の参照を持ったまま
+  - インスタンスが残ってしまって GC に回収されずメモリリークとなる
+
+```java
+public Object pop() {
+  if (size == 0)
+    throw new EmptyStackException();
+  Object result = elements[--size];
+  elements[size] = null; // 廃れた参照を消す
+  return result;
+}
+```
+- null を設定して参照を外す
+  - 間違って elements[size] を参照した時についでに NullPointerException を返してくれるようになる
+- **ただし、オブジェクトに null を設定するのは異例で通常はやるべきでない**
+  - クラス自身がメモリを管理する機構を持つ時
+  - クラスがキャッシュ機構を持つ時
+    - キャッシュされていることが忘れがちのため、弱い参照を持つ WeakHashMap で持つ
+    - ついでに利用されなくなったキャッシュを破棄する機構も入れる
+  - リスナーやコールバックを持つ時
+    - これも存在が忘れがちだから WeakHashMap で持つ
+- 普通はスコープから外れたら参照が外れる
+  - 可能な限り最小限のスコープ内で宣言する
 
 
 ## Item 8: Avoid finalizers and cleaners
