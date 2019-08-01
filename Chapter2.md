@@ -513,6 +513,84 @@ public Object pop() {
 ## Item 8: Avoid finalizers and cleaners
 
 ### まえおき
+インスタンスが破棄されたり、参照が外されるタイミングで実行される finalizer と cleaner はデメリットが多すぎるため使わないことを推奨する。この節ではこれらのデメリットと代替案を紹介する。  
+※ Java9 では finalizer は deprecated だがライブラリでまだ使われている
+
+### finalizer と cleaner のデメリット
+#### いつ呼ばれるかがわからなし、必ず呼ばれるとも限らない
+- finalize() や clean() は GC が行われる時に呼ばれる
+  - そもそもいつ GC が行われるのかわからない
+  - GC のタイミングも制御できない
+  - GC される前に終了したらそもそも呼ばれない
+    - finalize() や clean() で永続化に関わる処理があっても、何も起きない
+```java
+public class Teenager {
+  public static void main(String[] args) {
+    new Room(99); // Room は GC に回収される時に "Cleaning room." が出力される
+    System.out.println("Peace out!");
+  }
+}
+```
+- Peace out! のあとに Cleaning room. が出力されて欲しかった
+
+#### ひどくパフォーマンスが落ちる
+- finalizer や cleaner は GC をとてつもなく非効率化する
+
+#### ファイナライザには脆弱性がある
+```java
+public class Zombie {
+  static Zombie zombie;
+
+  public void finalize() {
+    zombie = this;
+  }
+}
+```
+- zombie は GC で回収されるはずが、finalize() で復活する
+- 何もしない final finalize() を作ったり、final クラスを作って対処する
+  - final クラスは継承できない
+  - final finalize() はオーバーライドできない
+
+### 代替案と許容されるケース
+#### AutoCloseable インタフェース implement する
+```java
+public class Room implements AutoCloseable {
+  private static final Cleaner cleaner = Cleaner.create();
+
+  private static class State implements Runnable {
+    int numJunkPiles;
+
+    State(int numJunkPiles) {
+      this.numJunkPiles = numJunkPiles;
+    }
+
+    @Override public void run() {
+      System.out.println("Cleaning room");
+      numJunkPiles = 0;
+    }
+  }
+
+  private final State state;
+
+  // Room インスタンスが GC に回収される時に clean() する
+  private final Cleaner.Cleanable cleanable;
+
+  public Room(int numJunkPiles) {
+    state = new State(numJunkPiles);
+    cleanable = cleaner.register(this, state);
+  }
+
+  @Override public void close() {
+    cleanable.clean();
+  }
+}
+```
+- close() をオーバーライドする
+  - インスタインスが必要なくなったら close() を呼びだす
+- clean() は close() し忘れた時の安全網として使う
+
+#### GC が管理してないネイティブオブジェクトに対して使う
+- GC で管理してるインスタンスが破棄される時に clean() でネイティブオブジェクトを一緒に破棄する
 
 
 ## Item 9: Prefer *try*-with-resources to *try*-*finally*
