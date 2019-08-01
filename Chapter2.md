@@ -596,4 +596,71 @@ public class Room implements AutoCloseable {
 ## Item 9: Prefer *try*-with-resources to *try*-*finally*
 
 ### まえおき
-close
+InputStream, OutputStream, java.sql.Connection など close メソッドで明示的に閉じる必要がある。今までは try-finally で close メソッドを呼ぶのが良しとされていたが、可読性が悪くバグを生み出しやすい。この節では try-with-resources による方法を紹介する。
+
+### try-finally での実装
+```java
+// 単一 try-finally だと問題はない
+static String firstLineOfFile(String path) throws IOException {
+  BufferedReader br = new BufferedReader(new FileReader(path));
+  try {
+    return br.readLine();
+  } finally {
+    br.close()
+  }
+}
+```
+```java
+// try-finally がネストされる場合だとやばい
+static void copy(String src, String dst) throws IOException {
+  InputStream in = new FileInputStream(src);
+  try {
+    OutputStream out = new FileOutputStream(dst);
+    try {
+      byte[] buf = new byte[BUFFER_SIZE];
+      int n;
+      while((n = in.read(buf)) >= 0)
+        out.write(buf, 0, n);
+    } finally {
+      out.close()
+    }
+  } finally {
+    in.close()
+  }
+}
+```
+- ネストされると可読性が悪い
+  - バグの原因にもなる
+- 最後に発生した例外だけが見られる
+  - 上だと br.readLine() と br.close() で例外が発生すると br.readLine() の例外がもみ消される
+
+### try-with-resources での実装
+```java
+static String firstLineOfFile(String path) throws IOException {
+  try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+    return br.readLine();
+  }
+}
+```
+```java
+static void copy(String src, String dst) throws IOException {
+  try (InputStream in = new FileInputStream(src); OutputStream out = new FileOutputStream(dst)) {
+    byte[] buf = new byte[BUFFER_SIZE];
+    int n;
+    while ((n = in.read(buf)) >= 0)
+      out.write(buf, 0, n);
+  }
+}
+```
+- Closable または AutoClosable を extend または implement してると 自動で閉じられる
+
+```java
+static String firstLineOfFile(String path, String defaultVal) {
+  try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+    return br.readLine();
+  } catch (IOException e) {
+    return defaultVal;
+  }
+}
+```
+- 例外もキャッチできる
