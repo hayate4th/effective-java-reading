@@ -14,10 +14,23 @@ public static Boolean valueOf(boolean b) {
 
 ### static factory メソッドの長所
 #### 1. 名前がついている
+- コンストラクタはクラス名と一緒でないといけない
+
 #### 2. 呼び出されるたびにインスタンスを生成する必要がない
+- コンストラクタは必ずインスタンスを生成する
+- 柔軟性がある
+  - singleton (Item 3), インスタンス生成不可 (Item 4), immutable クラス (Item 17) でも応用が聞く
+
 #### 3. あらゆるサブクラスを返せる
+- コンストラクタは必ずそのクラスのインスタンスを返す
+- 同じく柔軟性がある
+
 #### 4. 引数によって返すインスタンスを変えられる
-#### 5. メソッドを含むクラスを書いた段階で戻り値のクラスが存在する必要がない
+- コンストラクタは必ずそのクラスのインスタンスを返すからできない
+
+#### 5. メソッドを含むクラスを作成した段階で戻り値のクラスが存在しないインスタンスを生成できる
+- コンストラクタは必ずそのクラスのインスタンスを返すから書いた時点でクラスは存在してる
+- static factory メソッドは存在しないクラスのインスタンスを返せる
 ```java
 // インタフェースを戻り値として持つ (コンパイルは通る)
 public static MyInterface getMyInterfaceInstance() {
@@ -27,8 +40,37 @@ public static MyInterface getMyInterfaceInstance() {
 
 ### static factory メソッドの短所
 #### 1. public/protected なコンストラクタを持たないクラスはサブクラス化できない
-#### 2. 探しにくい, 見つけにくい
+- コンポジション (Item 18) を促すことができるからそこまで短所ではない
 
+#### 2. 探しにくい, 見つけにくい
+- static factory メソッドは API ドキュメントでコンストラクタに比べて目立たない
+  - 命名規則に従うことによって弱点をある程度克服する
+    - from
+      - 一つの引数を受け取って対応するインスタンスを返す型変換に使う
+      - Date d = Date.from(instant);
+    - of
+      - 複数の引数を受け取って、それらを扱うインスタンスを返す
+      - Set<Rank> faceCards = EnumSet.of(JACK, QUEEN, KING);
+    - valueOf
+      - from と of の代替案
+      - BigInteger prime = BigInteger.valueOf(Integer.MAX_VALUE);
+    - instance or getInstance
+      - 引数で指定したインスタンスを返す
+      - インスタンスが渡した引数と同じ値を持つとは限らない
+      - StackWalker luke = StackWalker.getInstance(options);
+    - create or newInstance
+      - 必ず新しいインスタンスを返す
+      - Object newArray = Array.newInstance(classObject, arrayLen);
+    - get*Type*
+      - 対象のクラスと異なるクラスを返す
+      - FileStore fs = Files.getFileStore(path);
+    - new*Type*
+      - 対象のクラスと異なるクラスを返す
+      - 必ず新しいインスタンスを返す
+      - BufferedReader br = Files.newBufferedReader(path);
+    - *type*
+      - get*Type* と new*Type* の代替案
+      - List<Complaint> litany = Collections.list(legacyLitany);
 
 ## Item 2: Consider a builder when faced with many constructor parameters
 
