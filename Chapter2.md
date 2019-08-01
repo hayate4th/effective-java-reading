@@ -518,11 +518,11 @@ public Object pop() {
 
 ### finalizer と cleaner のデメリット
 #### 1. いつ呼ばれるかがわからなし、必ず呼ばれるとも限らない
-- finalize() や clean() は GC が行われる時に呼ばれる
+- finalize メソッド や clean メソッド は GC が行われる時に呼ばれる
   - そもそもいつ GC が行われるのかわからない
   - GC のタイミングも制御できない
   - GC される前に終了したらそもそも呼ばれない
-    - finalize() や clean() で永続化に関わる処理があっても、何も起きない
+    - finalize メソッド や clean メソッド で永続化に関わる処理があっても、何も起きない
 ```java
 public class Teenager {
   public static void main(String[] args) {
@@ -546,10 +546,10 @@ public class Zombie {
   }
 }
 ```
-- zombie は GC で回収されるはずが、finalize() で復活する
-- 何もしない final finalize() を作ったり、final クラスを作って対処する
+- zombie は GC で回収されるはずが、finalize メソッド で復活する
+- 何もしない final finalize メソッド を作ったり、final クラスを作って対処する
   - final クラスは継承できない
-  - final finalize() はオーバーライドできない
+  - final finalize メソッド はオーバーライドできない
 
 ### 代替案と許容されるケース
 #### AutoCloseable インタフェース implement する
@@ -585,14 +585,15 @@ public class Room implements AutoCloseable {
   }
 }
 ```
-- close() をオーバーライドする
+- close メソッド をオーバーライドする
   - インスタインスが必要なくなったら close() を呼びだす
-- clean() は close() し忘れた時の安全網として使う
+- clean メソッド は close メソッド し忘れた時の安全網として使う
 
 #### GC が管理してないネイティブオブジェクトに対して使う
-- GC で管理してるインスタンスが破棄される時に clean() でネイティブオブジェクトを一緒に破棄する
+- GC で管理してるインスタンスが破棄される時に clean メソッド でネイティブオブジェクトを一緒に破棄する
 
 
 ## Item 9: Prefer *try*-with-resources to *try*-*finally*
 
 ### まえおき
+close
