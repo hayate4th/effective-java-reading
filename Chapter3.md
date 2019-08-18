@@ -1,0 +1,387 @@
+# すべてのオブジェクトに共通のメソッド
+Objectは具象クラスであるにもかかわらず、主に拡張されるために設計されている。final ではないメソッド(equals, hashCode, toString, clone, finalize)はオーバーライドされるように設計されているので、明示的な`一般契約`をもつ。それらの一般契約に従うことは、それらのメソッドをオーバーライドするクラスの責任である。契約に従わないクラスは、その契約に依存している他のクラスと一緒には適切に機能しなくなる。
+
+3章ではfinalではない Object のメソッドを、いつどのようにオーバーライドするかについて説明する finalize メソッドについては項目8で説明したので本章では省く。
+
+# 項目10 equalsをオーバーライドするときは一般契約に従う
+equals メソッドをオーバーライドするときは一般契約に従う。equals メソッドを間違ったやり方でオーバーライドする方法は沢山ある。問題を避ける最も良い方法はメソッドをオーバーライドしないことである。
+
+## equalsをオーバーライドしてはならないとき
+- クラスの個々のインスタンスが本質的に一意である
+    - Thread のような値ではなく、能動的な実体を表すクラスに対しては Object が提供している equals の実装が最良である
+- クラスが「論理的等価性」の検査を提供する必要がない
+    - 特定のクラスに equals をオーバーライドしても、クライアントがその機能を必要としない場合は Object から継承された equals の実装を使う
+- スーパークラスがすでに equals をオーバーライドしており、スーパークラスの振る舞いがこのクラスに対して適切である
+- クラスが private あるいはパッケージプライベートであり、そのequalsメソッドが呼び出されないことが確かである
+    - うっかり呼び出されないようにequalsメソッドを次のようにオーバーライドできる
+
+```java
+@Override public boolean equals(Object o) {
+    throw new AssertionError() //メソッドは呼び出されない
+}
+```
+
+- 1つのオブジェクトしか存在しないようにするためにインスタンス制御(項目1)を使うクラス
+    - enum(項目34)はこれに当てはまる
+
+## equalsをオーバーライドしてもよいとき
+- クラスがオブジェクトの同一性を超えた、「論理的等価性」の概念を持っている
+- スーパークラスが equals をオーバーライドしていない時
+
+上記を満たすのは Integer や String などのように値を表現する値クラスである場合が多い。
+
+## equalsの一般契約
+Object の equals をオーバーライドする場合に、厳守しなければならない一般契約の性質は以下の通りである。
+- 反射性（reflexive）
+- 対照性（symmetric）
+- 推移性（transitive）
+- 整合性（consistent）
+- 非null性（non-null）
+
+## 反射性
+`定義：nullではない任意の参照値xに対して、x.equals(x)はtrueを返さなければならない`
+
+オブジェクトがそれ自身と等しくならなければならないことを要求している。
+
+## 対称性
+`定義：nullではない任意の参照値xとyに対して、y.equals(x)がtrueを返す場合のみ、x.equals(y)はtrueを返さなければならない`
+
+いかなる2つのオブジェクトでも、それらが等しいかどうか合意しなければならないことを要求している。
+
+この条件を無視した equals を実装する。
+以下に大文字小文字を区別しない文字列を実装している CaseInsensitiveString クラスを示す。
+
+```java
+// 対称性を守っていない
+public final class CaseInsensitiveString {
+    private final String s;
+
+    public CaseInsensitiveString(String s) {
+        this.s = Objects.requireNonNull(s);
+    }
+
+    // 対称性を守っていない
+    @Override public boolean equals(Object o) {
+        if (o instanceof CaseInsensitiveString) {
+            return s.equalsIgnoreCase(((CaseInsensitiveString) o).s);
+        }
+
+        if (o instanceof String) { // 一方向の相互作用
+            return s.equalsIgnoreCase((String) o);
+        }
+
+        return false;
+    }
+}
+```
+
+この実装では x.equals.(y) と y.equals(x) それぞれの真偽値が異なってしまう。これは、String クラスの equals は CaseInsensitiveString に関しては何も知らないために起きる。
+
+```java
+CaseInsensitiveString cis = new CaseInsensitiveString("Polish");
+String s = "polish";
+cis.equals(s); // true
+s.equals(cis); //false
+```
+
+CaseInsensitiveString をコレクションに入れたと仮定する。
+
+```java
+List<CaseInsensitiveString> list = new ArrayList<>();
+list.add(cis);
+list.contains(s); //何を返すかは実装に依存する
+```
+
+この問題はequalsメソッドからStringを扱う条件分岐をを取り除くことで解決する
+
+```java
+@Override public boolean equals(Object o ) {
+    return o instanceof CaseInsensitiveString && ((CaseInsensitiveString) o).s.equalsIgnoreCase(s);
+}
+```
+
+## 推移性
+`定義：nullではない任意の参照値x,y,zに対して、もし、x.equals(y), y.equals(z)がtrueを返すならば、x.equals(z)はtrueを返さなければならない`
+
+1つ目のオブジェクトが2つ目のオブジェクトと等しく、かつ、2つ目のオブジェクトが3つ目のオブジェクトと等しい場合は1つ目のオブジェクトは3つ目のオブジェクトと等しくならなければならない。
+
+スーパークラスに新たな`値要素`を付加するサブクラスを考える。
+
+```java
+public class Point {
+    private final int x;
+    private final int y;
+    public Point(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Point)) {
+            return false;
+        }
+        Point p = (Point) o;
+        return p.x == this.x && p.y == this.y;
+    }
+}
+
+public class ColorPoint extends Point {
+    private Color color;
+    public ColorPoint(int x, int y, Color color) {
+        super(x, y);
+        this.color = color;
+    }
+}
+```
+この場合、一般契約は破られていないが、equalsの比較で色情報が無視されてしまう。
+
+引数に同じ位置と色と持つ他のカラーポイントが与えられた場合にtrueを返すequalsメソッドを作る。
+
+```java
+// 対象性を守っていない
+@Override
+public boolean equals(Object o) {
+    if (!(o instanceof ColorPoint)) {
+        return false;
+    }
+    return super.equals(o) && ((ColorPoint) o).color == color;
+}
+```
+
+この場合、対称性が守られない。
+
+```java
+Point p = new Point(1, 2);
+ColorPoint cp = new ColorPoint(1, 2, Color.RED);
+p.equals(cp); // true
+cp.equals(p); // false 
+```
+
+そこで、次のように ColorPoint.equals が色を無視することでこの問題を解決しようと試みる。
+
+```java
+@Override
+// 推移性を守っていない
+public boolean equals(Object o) {
+    if (!(o instanceof Point)) {
+        return false;
+    }
+    // oが普通のポイントなら、色を無視した比較をする
+    if (!(o instanceof ColorPoint)) {
+        return o.equals(this);
+    }
+    return super.equals(o) && ((ColorPoint) o).color == color;
+}
+```
+
+この方法は対称性を守っているが、推移性を守っていない
+
+```java
+ColorPoint p1 = new ColorPoint(1, 2, Color.RED);
+Point p2 = new Point(1, 2);
+ColorPoint p3 = new ColorPoint(1, 2, Color.BLUE);
+p1.equals(p2); // true   色が見えない
+p2.equals(p3); // true   色が見えない
+p1.equals(p3); // false  色を考慮している
+```
+
+また、この方法は無限再帰を引き起こす可能性がある。
+
+Pointのサブクラスに ColorPoint と SmellPoint の2つがあり、それぞれにこのようなequalsメソッドがオーバーライドされていると仮定する。
+
+```java
+ColorPoint cp = new ColorPoint(1, 2, Color.RED); // Pointのサブクラス
+SmellPoint sp = new SmellPoint(1, 2); // Pointのサブクラス
+cp.equals(sp); // StackOverflowError
+```
+
+この問題の解決方法として、instanceOfの代わりに getClass() を用いる方法がある。
+
+その場合はリスコフの置換原則を破ることになる。
+
+参考：[リスコフの置換原則](http://marupeke296.com/OOD_No7_LiskovSubstitutionPrinciple.html)
+
+```java
+// ColorPointのequals
+@Override
+public boolean equals(Object o) {
+    if (!(o instanceof ColorPoint)) {
+        return false;
+    }
+    return super.equals(o) && ((ColorPoint) o).color == color;
+}
+
+// Pointのequals
+@Override
+public boolean equals(Object o) {
+    // リスコフのち缶原則を破っている
+    if (o == null || o.getClass() != getClass()) {
+        return false;
+    }
+    Point p = (Point) o;
+    return p.x == this.x && p.y == this.y;
+}
+```
+
+```java
+// 推移性が守られる
+ColorPoint p1 = new ColorPoint(1, 2, Color.RED);
+Point p2 = new Point(1, 2);
+ColorPoint p3 = new ColorPoint(1, 2, Color.BLUE);
+p1.equals(p2); // => false
+p2.equals(p3); // => false
+p1.equals(p3); // => false
+```
+
+この場合、オブジェクト同士が同じ実装クラスである場合にのみ等しくなるので推移性が守られる。
+
+しかし、PointとColorPointを HashSet に格納している場合に期待通りに動作しない。
+
+以下に点が単位円の上にあるか判定するメソッドを示す。
+
+```java
+private static final Set<Point> unitCircle = Set.of(
+        new Point(1, 0), new Point(0, 1),
+        new Point(-1, 0), new Point(0, -1));
+
+public static boolean onUnitCircle(Point p) {
+    return unitCircle.contains(p);
+}
+```
+
+次に、生成されたインスタンスの個数をコンストラクタで記録するようにPointクラスを拡張したCounterPointクラスを示す。
+
+```java
+public class CounterPoint extends Point {
+    private static final AtomicInteger counter = new AtomicInteger();
+
+    public CounterPoint(int x, int y) {
+        super(x, y);
+        // 以下省略
+    }
+}
+```
+
+Pointのサブクラスのインスタンスは Point として機能する必要がある(リスコフの置換原則)。しかし、以下のように onUnitCircle に対してCounterPointインスタンスを渡し、Pointクラスが getClass に基づくequalsメソッドを使っている場合、CounterPointメソッドのxとy座標に関係なく false を返すようになる。これは、HashSet といったほとんどのコレクションがequalsを使って実装されており、CounterPointインスタンスがどのPointとも等しくならないことが原因である。
+
+```java
+CounterPoint cp = new CounterPoint(0, 1);
+onUnitCircle(cp) // false
+```
+
+`インスタンス可能なクラスを拡張してequalsの契約を守ったまま値要素を追加する方法はない`。 インスタンス化可能クラスを拡張して値を追加するよい方法は、拡張の代わりにコンポジションを持ちいてviewメソッドを利用する方法である（項目6）。
+
+```java
+// equals契約を破ることなく値要素を追加する
+public class ColorPoint {
+    private final Point point;
+    private final Color color;
+
+    public ColorPoint(int x, int y, Color color) {
+        this.point = new Point(x, y);
+        this.color = color;
+    }
+
+    // このカラーポイントとしてのビューを返す
+    public Point asPoint() {
+        return point;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof ColorPoint)) {
+            return false;
+        }
+        return cp.point.equals(point) && cp.color.equals(color);
+    }
+}
+```
+
+抽象クラスのサブクラスにはequalsの契約を破ることなく値要素を追加することができる。上記で示した問題はスーパークラスのインスタンスが生成されない限り発生しない。
+
+## 整合性
+`定義：nullではない任意の参照値xとyに対して、x.equals(y)の複数回の呼び出しは、equalsの比較で使われる情報に変更がなければ一貫してtrueを返すかfalseを返さなければならない`
+
+不変オブジェクトが時間の経過により異なるオブジェクトと等しくなることはない。一方で、可変オブジェクトは等しくなり得る。クラスが不変であるかに関係なく、`信頼できない資源に依存するequalsを書いてはならない`。そのような場合はこの整合性を守ることが非常に難しくなる。
+
+java.net.URL の equals はホストをIPアドレスに変換する必要があるため、ネットワークアクセスが必要となる。 そのため、オブジェクトが変更されていないにも関わらず、常に一致することが保証できない。これは実際に問題を引き起こしている。
+
+## 非null性
+`定義：nullではない任意の参照値xに対して、x.equals(null)はfalseを返さなければならない`
+
+すべてのオブジェクトはnullと等しくなってはならない。また、NullPointerExceptionをスローすることも認められていない。
+
+これを満たすための実装を以下に示す。
+
+```java
+@Override public boolean equals(Object o) {
+    if (!(o instanceof MyType)) {
+        return false;
+    }
+    // 以下省略
+}
+```
+
+equalsではnullチェックが必要であるが、instanceof演算子は第1オペランドがnullの場合は必ずfalseを返すため、明示的にnullをチェックする必要はない。
+
+## 正しいequals書き方
+1. 引数が自分自身のオブェクトであるかどうかを検査するために == 演算子を使用する。必須ではないが、比較のコストを低減することができる。
+
+1. 引数が正しい型であるかを調べるために instanceof を使用する。
+
+1. 引数を正しい型にキャストする。instanceof によって型が検査されているので、例外は発生しない。
+
+1. 引数のオブジェクトのフィールドが、このオブジェクトの対応するフィールドと一致しているかどうか検査する
+    - 基本データ型には == を、オブジェクトには equals を使用する。
+    - float と double は Float.compare と Double.compare を利用する。※Float.equals, Double.equalsで比較できるが、比較ごとに自動ボクシングが伴うのでパフォーマンスが悪くなる。
+    - 配列のフィールドは Array.equals が利用できる。
+    - オブジェクトの参照フィールドが正当な値としてnullを含む場合があり、NullPointerException をさけるために Objects.equals(Object, Object); を使って同値性を検査する。
+    - CaseInsensitiveString のようにフィールドの比較が複雑な場合、そのフィールドの正規形として CaseInsensitiveString がすべての小文字の形式を保存するとしたら、標準的でない比較よりも正確な比較を行える。この技法は不変クラス（項目17）に対して最も適切である。
+
+1. equals を書き終えた後に「対称性」、「推移性」、「整合性」の三つの性質を満たしたかどうかを自問し、テストを書く。ただし、equalsメソッドを生成するためにAutoValue(51ページ)を使っている場合は単体テストを省略しても良い。「反射性」と「非 null 性」を満たす必要もあるが、この二つは大抵の場合満たされる。
+
+```java
+// 典型的なequalsメソッドをもつクラス
+public class PhoneNumber {
+    private final short areaCode, prefix, lineNum;
+
+    public PhoneNumber(int areaCode, int prefix, int lineNumber) {
+        this.areaCode = rangeCheck(areaCode, 999, "areaCode");
+        this.prefix = rangeCheck(prefix, 999, "prefix");
+        this.lineNum = rangeCheck(lineNumber, 9999, "line num");
+    }
+
+    private static void rangeCheck(int val, int max, String arg) {
+        if (val < 0 || val > max) {
+            throw new IllegalArgumentException(arg + ": " + val);
+        }
+        return (short) val;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this)
+            return true;
+        if (!(o instanceof PhoneNumber))
+            return false;
+
+        PhoneNumber phoneNumber = (PhoneNumber) o;
+        return phoneNumber.lineNum == this.lineNum
+                && phoneNumber.prefix == this.prefix
+                && phoneNumber.areaCode == this.areaCode;
+    }
+}
+```
+
+## 最後の注意事項
+- equals をオーバーライドするときは常に hashCode をオーバーライドする
+- あまりにかしこくなろうとしない。
+    - 単純にフィールドが等しいかどうかをテストすれば equals の契約を守れる。
+    - 例えばFileクラスは、同じファイルを参照しているシンボリックリンクを等しいとみなすべきではない。
+- equals の引数は Object 型である。
+    - equals の引数を Object 以外にするとオーバーロード（項目52）になる。これを防ぐために @Override アノテーションをつける（項目40）。
+
+## まとめ
+- 必要ない限りequalsメソッドをオーバーライドしない。
+- equalsをオーバーライドする場合は、クラスの意味のあるフィールドをすべて比較し、equalsの一般契約をすべて守る。
