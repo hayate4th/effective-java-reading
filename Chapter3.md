@@ -293,6 +293,7 @@ public class ColorPoint {
         if (!(o instanceof ColorPoint)) {
             return false;
         }
+        ColorPoint cp = (ColorPoint) o;
         return cp.point.equals(point) && cp.color.equals(color);
     }
 }
@@ -473,8 +474,18 @@ phoneNumber.toString(); // PhoneNumber@adbbd
 ### ドキュメンテーション
 - toStringの契約は、すべてのサブクラスがこのメソッドをオーバーライドすることを推奨している。
 - toStringメソッドはオブジェクトに含まれる興味のあるすべての情報を含むべきである。
-- 値クラスに対しては toString() の返り値を明示的に定義することが推奨される。
-- toString() を明示的に定義し、String を引数とする static ファクトリーメソッドやコンストラクタを提供すると、文字列表現とオブジェクトの相互変換が可能になる。 Java ライブラリの多くの値クラスではこれが採用されており、BigInteger や BigDecimal、基本データ型などがそれにあたる。
-- 戻り値を明示することの欠点は、クラスが広く使われていると、一度形式を明示してしまえば未来永劫変更することができなくなる点。
-- 戻り値の厳密な値を明記するかどうかに関わらず、toString() 実装の意図はドキュメントとして明記したほうがよい。
+```java
+// ↓{Jenny=PhoneNumber@adbbd} と {Jenny=707-867-5309} どちらで表示されるのが嬉しいか
+System.out.println("Failed to connect: " + phoneNumber);
+```
+返すべき情報量が多い場合は、すべての情報を返すのは実用的ではないので、 `Manhattan white pages (1487536 listings)` のようなメッセージを返す。
 
+
+- toString() を明示的に定義し、String を引数とする static ファクトリーメソッドやコンストラクタを提供すると、文字列表現とオブジェクトの相互変換が可能になる。 Java ライブラリの多くの値クラスではこれが採用されており、BigInteger や BigDecimal、基本データ型などがそれにあたる。
+```java
+new Integer("10"); //10
+```
+
+- 値クラスに対しては toString() の返り値をドキュメントに明示的に定義することが推奨される。
+- 戻り値の厳密な値を明記するかどうかに関わらず、toString() 実装の意図はドキュメントとして明記したほうがよい。
+    - 戻り値を明示することの欠点は、クラスが広く使われていると、一度形式を明示してしまえば未来永劫変更することができなくなる点。
