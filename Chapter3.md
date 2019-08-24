@@ -622,3 +622,29 @@ public Stack(Stack orig) {
 ```
 
 コピーコンストラクタやコピー static ファクトリーメソッドは Cloneable/clone アーキテクチャよりも多くの長所を持っている。 言語外のオブジェクト生成の仕組みに依存していませんし、final フィールドの使われ方と相反することがない。 また、不要な例外もスローしないし、キャストも必要としない。
+
+# 項目14 Comparableの実装を検討する
+アルファベット順、数値順、年代順などの自然な順序を持つ値クラスを書く場合はComparable インターフェースを実装するべき。
+
+compareTo は指定されたオブジェクトと自分自身の順序を比較する。 オブジェクトが自身と比べて、小さい、等しい、大きい、に応じて、負の整数、ゼロ、正の整数を返す。
+
+## compareToメソッドの一般契約
+表記 sgn(EXPRESSION) は数学上の符号関数を意味し、負、ゼロ、正のどれであるかに応じて -1, 0, 1 を返す。
+
+- すべての x と y に関して sgn(x.compareTo(y)) == -sgn(y.compareTo(x)) を保証する。これは y.compareTo(x) が例外をスローする場合にのみ、x.compareTo(y) は例外をスローしなければならないことを意味する。
+- 0 < x.compareTo(y) かつ 0 < y.compareTo(z) ならば 0 < x.compareTo(z) であることを保証する。（推移性）
+- すべての z に関して、x.compareTo(y) == 0 が sgn(x.compareTo(z)) == sgn(y.compareTo(z)) を保証する。
+- (x.compareTo(y) == 0) == (x.equals(y)) は強く推奨されるが、厳密には必須ではない。ただし、この条件を破る場合はそのことを明記する。
+- もし、指定されたオブジェクトが比較できない場合は ClassCastException をスローする。
+
+## compareToの実装
+- equals同様、インスタンス可能なクラスを拡張してcompareToの契約を守ったまま値を追加する方法はない （項目10）。この場合には「ビュー」メソッドを提供するべきである。
+- compareToメソッドで関係演算子 < と > を使うのは冗長で間違えやすいので推奨されない。
+- 比較は最も意味のあるフィールドから始めて、意味が弱くなる順番に順次比較を行う。※p71参考
+- Java8 からComparatorインターフェースはコンパレータ構築メソッドを持ち、こちらを使うと簡潔に実装できる。
+
+```java
+return o1.hashCode() - o2.hashCode(); // 整数のオーバーフローとIEEE754浮動小数点算術の副作用の危険性がある
+
+return Integer.compare(o1.hashCode(), o2.hashCode()); // static の compare を使う
+```
