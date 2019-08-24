@@ -464,14 +464,14 @@ public int hashCode() {
 - パフォーマンスを向上させるためにハッシュコードの計算から意味のある部分を排除してはならない。ハッシュ関数の動作は速くなるが、ハッシュテーブルのパフォーマンスを使えないほど遅くする可能性がある。
 - String, Integer, Date などの Java ライブラリは hashCode の返り値として厳密な値を定義している。これは、さらによいハッシュ関数の実装が見つかった場合に、置き換えることができなくなるので良い考えではない。hashCodeが返す値を厳密に決めないことで、変更する柔軟性が生まれる。
 
-## 項目12 toStringを常にオーバーライドする
+# 項目12 toStringを常にオーバーライドする
 ObjectはtoStringメソッドの実装を提供しているが、それが返す文字列は「クラス名@ハッシュコードの符号なし16進数表現」例：PhoneNumber@adbbdである。
 ```java
 PhoneNumber phoneNumber = new PhoneNumber(707, 867, 5309);
 phoneNumber.toString(); // PhoneNumber@adbbd
 ```
 
-### ドキュメンテーション
+## ドキュメンテーション
 - toStringの契約は、すべてのサブクラスがこのメソッドをオーバーライドすることを推奨している。
 - toStringメソッドはオブジェクトに含まれる興味のあるすべての情報を含むべきである。
 ```java
@@ -489,3 +489,136 @@ new Integer("10"); //10
 - 値クラスに対しては toString() の返り値をドキュメントに明示的に定義することが推奨される。
 - 戻り値の厳密な値を明記するかどうかに関わらず、toString() 実装の意図はドキュメントとして明記したほうがよい。
     - 戻り値を明示することの欠点は、クラスが広く使われていると、一度形式を明示してしまえば未来永劫変更することができなくなる点。
+
+## cloneを注意してオーバーライドする
+Cloneableメソッドを実装しているクラスは、適切に機能する public の clone メソッドを提供することが期待されている。
+- Cloneable インターフェースにはcloneメソッドがない
+- Objectのcloneメソッドはprotectedである
+- リフレクション（項目65）の手助けなしでは単にインターフェースを実装しているだけのObjectに対してcloneメソッドを呼び出すことができない。
+- Cloneableを実装していない場合は CloneNotSupportedException をスローする。
+
+## clone メソッドの一般契約
+```java
+x.clone() != x // true
+x.clone().getClass() == x.getClass(); // true 必須条件ではない
+x.clone().equals(x); // true 必須条件ではない
+```
+
+cloneメソッドが返すオブジェクトは super.clone を呼び出すことで得るべきである。スーパークラスがすべてこの慣習に従えば以下が成り立つ。
+```java
+x.clone().getClass() == x.getClass();
+```
+
+クラスのcloneメソッドがコンストラクタの呼び出しで得たインスタンスを返すと、サブクラスが super.clone を呼び出した場合にサブクラスの cloneメソッドが誤ったオブジェクトになる。
+
+```java
+class Super implements Cloneable {
+    private String value;
+
+	public Super(String str) {
+		this.value = str;
+	}
+
+	public String toString() {
+		return value;
+	}
+
+	@Override
+	public Super clone() {
+		return new Super(value); // コンストラクタ呼び出しで得たインスタンスを返す
+	}
+}
+
+class SubClass extends Super {
+	private int number;
+
+	public SubClass(String str, int n) {
+		super(str);
+		this.number = n;
+		System.out.println(super.clone()); // サブクラスのインスタンスが返らない
+	}
+}
+```
+クラスがfinalである場合は継承できないので super.clone を呼び出す慣習を無視して良い。
+
+不変オブジェクトの場合は無駄な複製を促すだけなので clone メソッドを提供する必要はない。
+
+```java
+// 可変な状態への参照を持たないメソッド
+@Override
+public PhoneNumber clone() {
+    try {
+        return (PhoneNumber) super.clone();
+    } catch (CloneNotSupportExtension e) {
+        throw new AssertionError(); // 起こり得ない
+    }
+}
+```
+共変戻り値型をサポートしているので、 clone メソッドが PhoneNumberを返している。
+共変戻り値型：メソッドをオーバーライドしたとき、戻り値の型をサブクラスにできる。これにより、呼び出し側でキャストが不要になる
+
+## 可変オブジェクトの参照がある場合
+- シャローコピー：メンバ変数がオブジェクトである場合に、その参照をコピーする。
+- ディープコピー：フィールドのオブジェクト自身も複写する方式。ディープコピーを自動的に行うメソッドは用意されていないので自分で作る必要がある。
+
+可変オブジェクトの参照があるクラスの場合はディープコピーを実装する必要がある。
+項目6で紹介した Stack クラスを考える
+```java
+public class Stack {
+    private Object[] elements;
+    private int size = 0;
+    private static final int DEFAULT_INITIAL_CAPACITY = 16;
+    
+    public Stack() {
+        this.elements = new Object[DEFAULT_INITIAL_CAPACITY];
+    }
+    
+    // 省略
+}
+```
+
+super.clone で返されるインスタンスは、elementsの参照先がコピーされている。
+これは Stack のコンストラクタを呼び出した場合には発生しない。
+正しくコピーするには、elements 配列に対して再帰的に clone を呼び出す必要がある。
+```java
+@Override
+public Stack clone() {
+    try {
+        Stack result = (Stack) super.clone();
+        result.elements = elements.clone();
+        return result;
+    } catch (CloneNotSupportedException e) {
+        throw new AssertionError();
+    }
+}
+```
+
+- elements が final である場合は再代入できないため、clone のアーキテクチャは可変オブジェクトを参照する final フィールドとは両立しないことを意味している。
+- ハッシュテーブルに対して clone メソッドを作成する場合は、元の buckets 配列をループしながら空ではない各バケットをコピーする。
+- clone メソッド生成中の複製先に対して、オーバーライド可能なメソッドを呼び出すべきではない（項目19）。
+    - clone メソッドの中で、複製先の状態を確定する前にそのメソッドが実行されると破損の可能性が高まる。
+    - Stack の put メソッドは final か private であるべき
+
+## cloneの実装方法について
+- public の clone メソッドはthrowsを削除する
+- 継承されるようにクラスを設計する場合は、Cloneableを実装すべきではない
+    - CloneNotSupportedException をスローすると宣言し、 protectedのクローンメソッドを実装する
+    - clone を呼び出すと例外を投げる clone メソッドを実装して、Cloneableをサポートしない
+
+## オブジェクトのコピーを行う代替手段
+コピーコンストラクタやコピーファクトリを提供する方法がある。
+```java
+public Stack(Stack orig) {
+        this.size = orig.size;
+        this.elements = orig.elements.clone();
+    }
+
+    public static Stack newInstance(Stack orig) {
+        Stack s = new Stack();
+        s.size = orig.size;
+        s.elements = orig.elements.clone();
+        return s;
+    }
+```
+
+コピーコンストラクタやコピー static ファクトリーメソッドは Cloneable/clone アーキテクチャよりも多くの長所を持っている。 言語外のオブジェクト生成の仕組みに依存していませんし、final フィールドの使われ方と相反することがない。 また、不要な例外もスローしないし、キャストも必要としない。
