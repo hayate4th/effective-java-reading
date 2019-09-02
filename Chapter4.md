@@ -79,7 +79,7 @@ public static final List<Thing> VALUES = Collections.unmodifiableList(Arrays.asL
 #### 解決法2: 配列を private にして、そのコピーを返す public メソッドを作る
 
 ```
-private static final Thing[] PRICATE_VALUES = {...};
+private static final Thing[] PRIVATE_VALUES = {...};
 public static final Thing[] values() {
     return PRIVATE_VALUES.clone();
 }
