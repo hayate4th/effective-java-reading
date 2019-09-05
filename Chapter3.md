@@ -483,7 +483,8 @@ System.out.println("Failed to connect: " + phoneNumber);
 
 - toString() を明示的に定義し、String を引数とする static ファクトリーメソッドやコンストラクタを提供すると、文字列表現とオブジェクトの相互変換が可能になる。 Java ライブラリの多くの値クラスではこれが採用されており、BigInteger や BigDecimal、基本データ型などがそれにあたる。
 ```java
-new Integer("10"); //10
+Integer integer = new Integer("10");
+new Integer(integer.toString());
 ```
 
 - 値クラスに対しては toString() の返り値をドキュメントに明示的に定義することが推奨される。
