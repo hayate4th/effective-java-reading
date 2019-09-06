@@ -262,11 +262,11 @@ List<String> strings = new ArrayList<>();
 ## 項目28 配列よりもリストを選ぶ
 配列は2つの点でジェネリクス型と異なっている。
 
-### 1. 配列は共変
-一つ目は、配列は共変だが、ジェネリクスは不変であること。
+### 1. 配列は*共変*
+一つ目は、配列は*共変*だが、ジェネリクスは*不変*であること。
 
-これは、`Sub` が `Super` のサブタイプならば、 `Sub[]` は `Super[]` のサブタイプだと言うことを意味する（共変）。
-一方、`List<Sub>` は `List<Super>` のサブタイプでもスーパータイプでもない（不変）。
+これは、`Sub` が `Super` のサブタイプならば、 `Sub[]` は `Super[]` のサブタイプだと言うことを意味する（*共変*）。
+一方、`List<Sub>` は `List<Super>` のサブタイプでもスーパータイプでもない（*不変*）。
 例えば、以下のコードはコンパイルが許されている。
 ```java
 Object[] objectArray = new Long[1];
@@ -282,7 +282,7 @@ ol.add("I don't fit in");
 もちろん、どちらの方法でもLongのコンテナにStringを入れることは許されないが、
 前者は実行時に、後者はコンパイル時にエラーとなる。もちろん後者が優っている。
 
-### 1. 配列は具象化 (reify) される
+### 2. 配列は具象化 (reify) される
 配列は実行時にその要素の型を知っており、それを強制する。
 上で見たように、互換性のない型を配列にストアしようとすると、ArrayStoreException が上げられる。
 
@@ -330,3 +330,104 @@ String s = stringLists[0].get(0)                   // (5)
 ジェネリック配列生成エラーを回避する最良の方法は、`List<E>` を使うことである。それはそう。
 パフォーマンスよりも、型安全性と相互運用性を手に入れることができる。
 
+### 例：`Chooser` クラス
+例えば、コレクションからランダムに要素を選んで返すメソッドを持つ`Chooser` クラスを書きたいとする。
+
+```java
+// (1) ジェネリック型を使わない場合
+public class Chooser {
+    private final Object[] choiceArray;
+
+    public Chooser(Collection choices) {
+        choiceArray = choices.toArray();
+    }
+
+    public Object choose() {
+        Random rnd = ThreadLocalRandom.current();
+        return choiceArray[rnd.nextInt(choiceArray.length)];
+    }
+}
+```
+
+このクラスの `choose` メソッドでは、要素を目的に応じた型にキャストする必要があるが、
+実行時に失敗する可能性がある。
+項目29の助言を受け止めて（まだ受け止めてない）、ジェネリック型に修正したい。
+
+```java
+// (2) ジェネリック化する試み（コンパイルできない）
+public class Chooser<T> {
+    private final T[] choiceArray;
+
+    public Chooser(Collection<T> choices) {
+        choiceArray = choices.toArray();
+    }
+    // chooseメソッドに変更はない。
+}
+```
+
+(2) は以下のようなコンパイルエラーが発生する。
+
+```console
+% javac Chooser.java
+Chooser.java:9: エラー: 不適合な型: Object[]をT[]に変換できません:
+        choiceArray = choices.toArray();
+                                     ^
+  Tが型変数の場合:
+    クラス Chooserで宣言されているTはObjectを拡張します
+```
+
+†たいしたことはない、Object配列をT配列にキャストするさ† と皆さんは言うでしょう。
+
+```java
+        choiceArray = (T[]) choices.toArray();
+```
+
+エラーは無くなるが、今度は警告が出る。
+
+```console
+% javac Chooser.java
+Chooser.java:9: 警告: [unchecked] 無検査キャスト
+        choiceArray = (T[]) choices.toArray();
+                                           ^
+  期待値: T[]
+  検出値:    Object[]
+  Tが型変数の場合:
+    クラス Chooserで宣言されているTはObjectを拡張します
+```
+
+実行時の型が何であるかはプログラムには分からないため、実行時におけるキャストの安全性を検査できないと、コンパイラは伝えている（無検査キャスト）。
+
+ジェネリックス型からは、その要素の型（型パラメータ）は実行時には消えていることに留意せよ。
+このプログラムは、実行時に動作するが、コンパイラはそれを証明できない。
+
+コメントに証明を書き、アノテーションで警告を抑制することもできるが、警告の原因を消し去る方が良い（項目27）。
+未検査キャスト警告を取り除くためには、配列の代わりに結局リストを使うことである。
+
+```java
+
+public class Chooser<T> {
+    private final ArrayList<T> choiceArray;
+
+    public Chooser(Collection<T> choices) {
+        choiceArray = new ArrayList<>(choices);
+    }
+
+    public T choose() {
+        Random rnd = ThreadLocalRandom.current();
+        return choiceArray.get(rnd.nextInt(choiceArray.size()));
+    }
+}
+```
+
+配列を使うよりも、`ArrayList<T>`を使う方がやや冗長で、少し遅いが実行時に`ClassCastException` が発生しないため若干安心です。
+（本音を言うと、`rnd.nextInt` が配列の範囲に収まることも型システムに言明してもらいたい）。
+
+### まとめ
+* 配列とジェネリックスは異なる型規則を持つ。
+* 配列はジェネリックスと調和しない。
+* こいつらを混在させたコードを書いていてエラーや警告が起こるなら、配列をやめてリストを使う。
+
+| おなまえ | サブタイプ規則 | 具象化 | 型安全性 |
+|:--|:-----------|:--------|:--------|
+|配列        | *共変* | 具象化される | 実行時のみ |
+|ジェネリックス| *不変*  | 型消去される | コンパイル時のみ |
