@@ -9,7 +9,7 @@ Effective Javaの解説と、[Java Language Specification](https://docs.oracle.c
 用語の定義はふわっと行う。
 
 ### 定義
-* **ジェネリック**クラス、**ジェネリック**インターフェイス:\
+* **ジェネリック**クラス、**ジェネリック**インターフェイス:\
 一つ以上の型パラメータを受け取る型変数を宣言に持つクラスおよびインターフェイス。総称して**ジェネリック型** という。
 * **型パラメータ**:\
 宣言において型を受け取る引数。例えば `List<E> { ... }` における `E`。
@@ -431,3 +431,103 @@ public class Chooser<T> {
 |:--|:-----------|:--------|:--------|
 |配列        | *共変* | 具象化される | 実行時のみ |
 |ジェネリックス| *不変*  | 型消去される | コンパイル時のみ |
+
+
+## 項目29 ジェネリック型を使う
+自分独自のジェネリック型を書くことは、ただ使うだけよりも若干難しい。
+ただ、この項目は簡単なので飛ばしつつ進める。
+テキストの `Stack` クラスのジェネリック化の最初の試みを以下に示す。
+
+```java
+public class Stack<E> {
+    private E[] elements;
+    private int size = 0;
+    private static final int DEFAULT_INITIAL_CAPACITY = 16;
+
+    public Stack() {
+        elements = new Obeject[DEFAULT_INITIAL_CAPACITY];
+    }
+
+    public void push(E e) {
+        ensureCapacity();
+        elements[size++] = e;
+    }
+
+    public void pop(E e) {
+        if (size == 0) {
+            throw new EmptyStackException();
+        }
+        E result = elements[--size];
+        elements[size] = null;
+        return result;
+    }
+    // 中略
+}
+```
+
+すると、具象化不可能型の配列の作成エラーとなる。
+```java
+        elements = new Obeject[DEFAULT_INITIAL_CAPACITY];
+```
+
+このクラスの正しいジェネリック化には2通りある。
+
+### 1. 配列をキャストする方法
+
+コンストラクタのみを以下のように書き換える方法。
+
+```java
+    public Stack() {
+        elements = (E[]) new Obeject[DEFAULT_INITIAL_CAPACITY];
+    }
+```
+
+* ただし、無検査キャスト警告が出る。
+* コンパイラは正しさを証明できないが、†みなさんはできます†。
+* 項目27のようにコメントを書き、警告を抑制すればOK
+
+#### 利点
+* 読みやすく簡潔。
+* 配列が `E[]` と宣言されており、`E`のインスタンスしか含まないことを明示する。
+* キャストが一箇所で済む
+* みんなだいたいこちらを使う
+
+#### 欠点
+* ヒープ汚染（項目32）を起こす
+
+### 2. 逐一キャストを行う方法
+
+1. `elements` の型を `Object[]` に書き換え、
+2. なおかつ、この配列から取り出す際にキャストを行う。
+
+```java
+    public void pop(E e) {
+        if (size == 0) {
+            throw new EmptyStackException();
+        }
+        E result = (E) elements[--size];
+        elements[size] = null;
+        return result;
+    }
+```
+
+* もちろん、無検査キャスト警告が出るが、同じように対処する必要がある。
+
+#### 利点
+* ヒープ汚染が発生しない（項目32）。
+
+#### 欠点
+* 配列から取り出すたびにキャストが必要となる
+
+### 議論
+
+* 先の例は、項目28のなるべくリストを使うべき、に反するようだが、いつでも使えるわけではない。
+* `Stack<int>` や `Stack<double>` など、プリミティブデータ型の`Stack` は作れない。
+  * ボクシングされたデータ型を使えばよい（項目61）。
+* **境界型パラメータ** を使い、型パラメータが何らかの型のサブタイプであることを要求できる。
+
+```java
+class DelayQueue<E extends Delayed> implements BlockingQueue<E>
+```
+
+* もちろん、自分自身は自分自身のサブタイプなので、`DelayQueue<Delayed>` の生成はOK。
