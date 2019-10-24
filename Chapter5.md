@@ -531,3 +531,87 @@ class DelayQueue<E extends Delayed> implements BlockingQueue<E>
 ```
 
 * もちろん、自分自身は自分自身のサブタイプなので、`DelayQueue<Delayed>` の生成はOK。
+
+
+## 項目30 ジェネリックメソッドを使う
+
+クラスをジェネリック化できるように、メソッドもジェネリック化できる。
+例えば、パラメータ化された型に対する static メソッドは大抵ジェネリックである。
+メソッドをジェネリック化する例を見ていく。
+
+```java
+public static Set union(Set s1, Set s2) {
+    Set result = new HashSet(s1);
+    result.addAll(s2);
+    return result;
+}
+```
+
+型パラメータのリストは、メソッドの修飾子とメソッドの戻り値型の間に入る。
+以下のようにジェネリック化できる。
+
+```java
+public static <E> Set<E> union(Set<E> s1, Set<E> s2) {
+    Set result<E> = new HashSet<>(s1);
+    result.addAll(s2);
+    return result;
+}
+```
+
+（ジェネリックメソッドをテストするプログラムは省略）
+
+この `union` メソッドの制約は、3つのSetすべての肩が同じでなければいけないことである。
+境界ワイルドカード型（項目31）を使うことでメソッドをより柔軟にできる。
+
+### ジェネリック・シングルトン・ファクトリ
+不変だが多くの型に適用できるオブジェクトを生成する必要がある。
+ジェネリックはイレイジャ（項目28）によって実装されているため、
+要求される全ての型パラメータに対して単一のオブジェクトを使うことができる。
+
+ジェネリック・シングルトン・ファクトリと呼ばれるこのパターンは、`Collections.reverseOrder` 
+といった関数オブジェクト（項目42）や`Collections.emptySet` といったコレクションで使われる。
+
+恒等関数を自作することを考える。以下のように書ける。
+
+```java
+private static UnaryOperator<Object> IDENTITY_FN = (t) -> t;
+
+@SuppressWarnings("unchecked")
+public static <T> UnaryOperator<T> identityFunction() {
+    return (UnaryOperator<T>) IDENTITY_FN;
+}
+```
+
+もちろん無検査キャスト警告が発生するのですぐさま抑制しに入る。
+しかし、恒等関数は引数を何も変更しないので、すべての型に対して安全であることがわかっているのでOK。
+
+（使用例は略）
+
+### 再帰型境界
+まれだが、型パラメータをその型パラメータ自身が関係する何らかの式で制限することが可能である。
+
+```java
+public interface Comparable<T> {
+    int compareTo(T o);
+}
+```
+
+ここで型パラメータ`T`は、`Comparable<T>` を実装している型の要素との比較が可能な型である。
+ただ、実際はほぼ全ての型が自分自身の型の要素同士だけで比較可能である。
+例えば、`String` は `Comparable<String> ` を実装し、`Integer` は `Comparable<Integer>` を実装する。
+
+ところで、コレクションをソートしたり、コレクション内の最小値や最大値を得るといったメソッドは多く存在する。
+こういった操作を行うためには、コレクション内の全ての要素が、ほかの要素と相互に比較可能である必要がある。
+この制約を表現する方法は以下の通りである。
+
+```java
+public static <E extends Comparable<E>> E max(Collection<E> c);
+```
+
+`<E extends Comparable<E>` は、自分自身と比較可能な任意の型`E` と読むことができる。
+
+（実装例は省略）
+
+### まとめ
+- ジェネリックメソッドを使え、原型を使うな。
+- キャストを必要とする既存のメソッドをジェネリック化しても互換性を保てる。
