@@ -800,3 +800,47 @@ Java 8 より以前は、型推論の規則は上のコードを処理できる�
 ```java
 Set<Number> numbers = Union.<Number>union(integers, doubles);
 ```
+
+### 複雑な例: `max` メソッド
+
+項目30の `max` メソッドは元々以下のような宣言であった。
+
+```java
+public static <T extends Comparable<T>> T max(List<T> list)
+```
+
+これをワイルドカード型を使って修正する。この宣言はこの本全体の中で最も複雑な宣言だろう。
+
+```java
+public static <T extends Comparable<? super T>> T max(List<? extends T> list)
+```
+
+1. パラメータ `list` については、型 `T` を一方的に供給するため、プロデューサにあたる。
+したがって、 `List<? extends T>` と置き換える。
+1. 次に、`T extends Comparable<? super T>`という部分について考える。
+`T` は元々、`Comparable<T>` のサブタイプであると指定されていた。
+ここで、`T` と比較可能な型について考えると、以下のような `compare` メソッドを実装するため、
+このオブジェクトは `T` のコンシューマであると言える。
+
+```java
+    // T を消費し、int を生産する
+    int compareTo(T o);
+```
+
+したがって、`Comparable<T>` の部分は、`Comparable<? super T>` で置き換えられる。
+
+これがうれしい具体的な例を挙げる。例えば、`max` メソッドが上記のように修正されると、
+以下のようなリストで `max` メソッドが使える。
+
+```java
+List<ScheduledFuture<?>> scheduledFutures = ... ;
+```
+
+状況はこうなっている：
+- `ScheduledFuture` は `Comparable<ScheduledFuture>` を実装しない。
+- その代わり、`ScheduledFuture` は、 `Comparable<Delayed>` を実装している `Delayed` のサブインターフェイスである。
+- 言い換えるならば、`ScheduledFuture` は 他の `ScheduledFuture` との比較はできないが、
+`Delayed` との比較は可能である。
+
+また、ワイルドカード型が必要となるのは、`Comparable` を直接実装していないが、
+それを実装している型のサブタイプをサポートする場合である。
