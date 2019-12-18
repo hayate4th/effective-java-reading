@@ -172,3 +172,337 @@ public enum Operation {
     public abstract double apply(double x, double y);
 }
 ```
+
+## Item 37: Use EnumMap instead of ordinal indexing
+
+### 序数インデックスはダメ
+配列のインデックスに oridinal() を使ってはいけない
+
+```Java
+class Plant {
+    emun LifeCycle { ANNUAL, PERENNIAL, BIENNIAL }
+
+    final String name;
+    final LifeCycle lifeCycle;
+
+    Plan(String name, LifeCycle lifeCycle) {
+        this.name = name;
+        this.lifeCycle = lifeCycle;
+    }
+
+    @Override public String toString() {
+        return name;
+    }
+}
+
+Set<Plant>[] plantsByLifeCycle = (Set<Plant>[]) new Set[Plant.LifeCycle.values().length];
+for (int i = 0;i < plantsByLifeCycle.length; i ++)
+    plantsByLifeCycle[i] = new HashSet<>();
+
+// これはダメゼッタイ！
+for (Plant p : garden)
+    plantsByLifeCycle[p.lifeCycle.ordinal()].add(p);
+
+for (int i = 0;i < plantsByLifeCycle.length;i ++) {
+    System.out.printf("%s: %s%n", Plant.LifeCycle.values()[i], plantsByLifeCycle[i]);
+}
+```
+
+1. 配列はジェネリクスと互換性がない (Item 28)
+  - 無検査キャストの警告がでる
+2. Enum の ordinal() を使ってるため型安全ではない
+  - どのインデックスが何に該当するのかは実装者が把握していないといけない
+  - 間違えたインデックスを与えると間違えた挙動をする
+  - ラッキーなら ArrayIndexOutOfBoundsException が投げられる
+
+### EnumMap を使おう
+配列を使うこと自体が構造的に間違っている、マップを使おう
+Java に　EnumMap という Enum をキー値とする Map がある、すごい
+
+```Java
+// Item 33 境界型型トークンが必要
+Map<Plant.LifeCycle, Set<Plant>> plantsByLifeCycle = new EnumMap<>(Plant.LifeCycle.class);
+
+for (Plant.LifeCycle lc : Plant.LifeCycle.values())
+    plantsByLifeCycle.put(lc, new HashSet<>());
+
+for (Plant p : garden)
+    plantsByLifeCycle.get(p.lifeCycle).add(p)
+
+System.out.println(plantsByLifeCycle);
+```
+
+### ストリームとの併用
+ストリームの説明が終わってからみよう
+
+### 多次元的な表現
+```Java
+public enum Phase {
+    SOLID, LIQUID, GAS;
+
+    public enum Transition {
+        MELT, FREEZE, BOIL, CONDENSE, SUBLIME, DEPOSIT;
+
+        private static final Transition[][] TRANSITIONS = {
+            { null, MELT, SUBLIME },
+            { FREEZE, null, BOIL },
+            { DEPOSIT, CONDENSE, null }
+        };
+
+        public static Transition from(Phase from, Phase to) {
+            return TRANSITIONS[from.ordinal()][to.ordinal()];
+        }
+    }
+}
+```
+
+1. 定数の追加・削除の時の変更を忘れランタイムエラーになりやすい
+2. null が増えると無駄が増える
+3. Phase の 2乗の大きさになる
+
+避けるために EnumMap をネストする
+```Java
+public enum Phase {
+    SOLID, LIQUID, GAS, PLASMA; // PLASMA を新規追加してみる
+    public enum Transition {
+        MELT(SOLID, LIQUID), FREEZE(LIQUID, SOLID),
+        BOIL(LIQUID, GAS), CONDENSE(GAS, LIQUID),
+        SUBLIME(SOLID, GAS), DEPOSIT(GAS, SOLID),
+        IONIZE(GAS, PLASMA), DEIONIZE(PLASMA, GAS); // これ追加するだけ
+
+
+        private final Phase from;
+        private final Phase to;
+
+        public Transition(Phase from, Phase to) {
+            this.from = from;
+            this.to = to;
+        }
+
+        // 初期化
+        private static final Map<Phase, Map<Phase, Transition>> m =
+            Stream.of(values()).collect(groupingBy(t -> t.from, () -> new EnumMap<>(Phase.class), toMap(t -> t.to, t -> t, (x, y) -> y, () -> new EnumMap<>(Phase.class))));
+
+        public static Transition from(Phase from, Phase to) {
+            return m.get(from).get(to);
+        }
+    }
+}
+```
+
+ordinal() を使っていいケースなんてほとんどない、基本的に EnumMap を使おう。
+
+## Item 38: Emulate extensible enums with interfaces
+
+Enum は拡張できないし、拡張するべきではない！
+ただオペレーションコード（オペコード）の場合は拡張できる Enum が欲しい、
+固有の操作をユーザ自身が実装する形
+
+Enum がインタフェースを実装できるという点を利用して擬似的な拡張をする
+
+```Java
+
+public interface Operation {
+    double apply(double x, double y);
+}
+
+public enum BasicOperation implements Operation {
+    PLUS("+") {
+        public double apply(double x, double y) { return x + y; }
+    },
+    MINUS("-") {
+        public double apply(double x, double y) { return x + y; }
+    },
+    TIMES("*") {
+        public double apply(double x, double y) { return x + y; }
+    },
+    DIVIDE("/") {
+        public double apply(double x, double y) { return x + y; }
+    };
+
+    private final String symbol;
+
+    BasicOperation(String symbol) {
+        this.symbol = symbol;
+    }
+
+    @Override public String toString() {
+        return symbol;
+    }
+}
+```
+
+BasicOperation は Enum のため拡張できないが、Operation は可能であるためそれで拡張する
+
+
+```Java
+
+public enum ExtendedOperation implements Operation {
+    EXP("^") { public double apply(double x, double y) { return Math.pow(x, y);}},
+    REMAINDER("%") { public double apply(double x, double y) { return x % y;}};
+
+    private final String symbol;
+
+    ExtendedOperation(String symbol) {
+        this.symbol = symbol;
+    }
+
+    @Override public String toString() {
+        return symbol;
+    }
+}
+```
+
+一部共通的なコードが重複してしまうが、それを避けたければヘルパーメソッドを実装する。
+
+### 擬似拡張した Enum の列挙
+```Java
+private static <T extends Enum<T> & Operation> void test(Class<T> opEnumType, double x, double y) {
+    for (Operation op : opEnumType.getEnumConstants())
+        System.out.printf("%f %s %f = %f%n", x, op, y, op.apply(x, y));
+}
+```
+
+Enum であり Operation を継承している Class<T>
+
+
+## Item 39: Prefer annotations to naming patterns
+
+
+### 命名パターン
+「テストケースメソッドの先頭には必ず test を書いてね！」とか
+1. test って書いてなくてもコンパイルできちゃう
+  - テストケースとして認識されない
+2. 利用箇所に制限がかけられない
+  - static メソッドだけとか、クラスにだけとか
+3. 引数との関連付けが困難
+  - ある例外を投げるテストケースにだけとか
+  - 命名パターンだけじゃ関連づけることはできない
+
+### アノテーション
+ソースコードにメタデータを付与する仕組み
+コンパイラや仮想マシンがその情報を使ったりする
+
+Java の標準アノテーションもあるし、新しくアノテーションを作ることもできる
+
+```Java
+import java.lang.annotation.*;
+
+// 自作アノテーション @Test
+@Retention(RetentionPolicy.RUNTIME) // メタアノテーション
+@Target(ElementType.METHOD) // メタアノテーション (引数なし static メソッドにしか付与できないよ！)
+public @interface Test {
+}
+```
+メタアノテーションでアノテーションに制限をかける
+
+```Java
+public class Sample {
+    @Test public static void m1() {}
+    public static void m2() {}
+    @Test public static void m3() {
+        throw new RuntimeException("Boom");
+    }
+    public static void m4() {}
+    @Test public void m5() {}  // static じゃないから @Test は使えないよ！
+    ...
+}
+```
+
+### どうやってアノテーションを確認してるか
+```Java
+import java.lang.reflect.*;
+
+public class RunTests {
+    public static void main(String[] args) throws Exception {
+        int tests = 0;
+        int passed = 0;
+        Class<?> testClass = Class.forName(args[0]);
+        for (Method m : testClass.getDeclaredMethods()) {
+            // Test のアノテーションが付与されているかをチェック
+            if (m.isAnnotationPresent(Test.class)) {
+                tests++;
+                try {
+                    m.invoke(null);
+                    passed++;
+                } catch (InvocationTargetException wrappedExc) {
+                    Throwable exc = wrapped.getCause();
+                    System.out.println(m + " failed: " + exc);
+                } catch (Exception exc) {
+                    System.out.println("INVALID @Test: " + m);
+                }
+            }
+        }
+        System.out.printf("Passed: %d, Failed: %d%n", passed, tests - passed);
+    }
+}
+```
+
+### 値を付与するアノテーション
+```Java
+import java.lang.annotation.*;
+
+@Retention(RetentionPolicy.RUNTIME) // メタアノテーション
+@Target(ElementType.METHOD) // メタアノテーション (引数なし static メソッドにしか付与できないよ！)
+public @interface ExceptionTest {
+    Class<? extends Throwable> value();
+}
+```
+
+```Java
+public class Sample2 {
+    @ExceptionTest(ArithmeticException.class)
+    public static void m1() {
+        int i = 0;
+        i = i / i;
+    }
+}
+```
+
+複数引数を与えるパターン
+```Java
+import java.lang.annotation.*;
+
+@Retention(RetentionPolicy.RUNTIME) // メタアノテーション
+@Target(ElementType.METHOD) // メタアノテーション (引数なし static メソッドにしか付与できないよ！)
+public @interface ExceptionTest {
+    Class<? extends Throwable>[] value();
+}
+```
+
+## Item 40: Consistently use the Override annotation
+
+@Override アノテーションは常に使おう
+
+### オーバーライドアノテーション
+スーパークラスのメソッドをオーバーライドしていることを示している
+
+Override アノテーションを使うと、オーバーライドした際の引数エラーなどでコンパイル時に検査してくれる
+
+抽象クラスの抽象メソッドをオーバーライドする場合や、インタフェースの宣言を実装する場合には @Override をつける必要はない
+つけても問題はないのでつけよう
+
+## Item 41: Use marker interfaces to define types
+
+### マーカーインタフェースとは
+メソッド宣言を一つももたないインタフェース
+- Serializable とか (ObjectOutputStream)
+
+ObjectOutputStream.write(Object o) に Serializable を実装していないインスタンスを渡すと例外が発生します。 本来、write の宣言は Object ではなく Serializable を引数にとるべきでした。 そうすれば、実行時の例外ではなくコンパイル時のエラーとして間違いを見つけることが出来ます。
+
+### マーカーアノテーションとは
+一方、マーカーアノテーションはその名の通り、何らかの特性を示すためのアノテーションです。
+
+アノテーション自体がメタデータを示すものなので、大抵、アノテーションはマーカーアノテーションとしての役割を果たします。
+
+
+### どっちがよい？
+マーカーインタフェースが利用できるならばマーカーアノテーションよりもマーカーインタフェースを使うべきです。
+
+マーカーインタフェースは型を定義できるため、コンパイル時にその特性をチェックすることができます。 マーカーアノテーションは一般的に実行時までその特性をチェックすることはできません。 （コンパイラが対応している @Override アノテーションなどは特別です）
+
+特に、このマーカーを付与したクラスをメソッドの引数に使いたい場合は、マーカーインタフェースを用いるべきです。
+
+ただし、マーカーインタフェースはクラス以外をマークすることが出来ません。 メソッドやフィールドをマークしたい場合はマークアのテーションを使う必要があります。
+
+マーカーアノテーションにデフォルト値をもたせて置けば、あとから値を追加することができます。 しかし、マーカーインタフェースにあとからメソッドを追加することは一般的にはできません。 コンパイル互換性を破壊するからです。
