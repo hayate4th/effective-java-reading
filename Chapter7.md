@@ -54,7 +54,7 @@ Collections.sort(words, (s1, s2) -> Integer.compare(s1.length(), s2.length()));
 Collections.sort(words, conparetingInt(String::length));
 ```
 
-Listインターフェースに追加されたsortメソッドを仕様するとさらに短くかける
+Listインターフェースに追加されたsortメソッドを使用するとさらに短くかける
 
 ```java
 words.sort(conparetingInt(String::length));
@@ -302,7 +302,7 @@ public class Anagrams {
 
 #### alphabetizeメソッドをストリームで書いてみる
 ```java
-"Hello world!".chars().forEach(System.out.::plintln);
+"Hello world!".chars().forEach(System.out::plintln);
 ```
 
 結果は 72101108....と表示される。これは chars() が返すストリームの要素が int値 だからである。
@@ -354,7 +354,7 @@ isProbablePrime の引数は素数判定の制御値である。
 .forEach(mp -> System.out.println(mp.bitLength() + ": " + mp));
 ```
 
-ストリームかループのどちらを使用するか確信が持てないときは両方を試して見て調べる。P210 ~P211のソースコード参照。
+ストリームかループのどちらを使用するか確信が持てないときは両方を試してみて調べる。P210 ~P211のソースコード参照。
 
 ## 項目46 ストリームで副作用のない関数を選ぶ
 ストリームの考え方で最も重要な部分は、計算を変換のシーケンスとして構築することである。
