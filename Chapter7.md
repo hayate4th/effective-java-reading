@@ -401,3 +401,31 @@ List<String> topTen = freq.keySet().stream()
 ```
 
 toList() メソッドを Collectorsで修飾していないのは、ストリームパイプラインの可読性を上げるために Collectors すべてのメンバーを static インポートするのが慣習だからである。
+
+comparing は、型TからComparableソート・キーを抽出する関数を受け取り、そのソート・キーで比較するComparator<T>を返す。
+各ストリーム要素はキーと値に関連付けられ、複数のストリーム要素を同一のキーに関連付けることができる。
+最も単純なマップのコレクターの使用例として、以下に文字列から enum へのマップを作成するtoMapコレクターを使用したプログラムを示す。
+
+```java
+private static final Map<String, Operation> stringToEnum = Stream.of(values()).collect(toMap(Object::toString, e -> e));
+```
+
+ストリームの複数の要素が同一のキーにマッピングされる場合は IllegalSteateException を返す。
+
+groupingBy および toMap はこのような衝突を回避するための手段をいくつか持っている。
+
+1.BinaryOperator などのマージ関数を持つ toMap メソッドを使用する方法。
+2.toMap の第3引数を使用する。
+
+たとえば、さまざまなアーティストによるレコードアルバムのストリームを持っていて、レコーディングアーティストからベストセラーへのアルバムへのマップがほしいと仮定する。
+```java
+// キーからキーに対して選択された要素へのマップを生成するコレクター
+Map<Artist, Album> topHits = album.collect(toMap(Album::artist, a->a, maxBy(comparing(Album::sales))));
+```
+
+maxBy は最大要素を生成するCollectorを返す。
+
+以下は衝突があるときに、最後の書き込みを優先するコレクターのプログラムである。
+```java
+toMap(keyMapper, valueMapper, (oldValue, newValue) -> newValue)
+```
