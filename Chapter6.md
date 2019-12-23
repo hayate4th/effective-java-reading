@@ -176,7 +176,7 @@ public enum Operation {
 ## Item 37: Use EnumMap instead of ordinal indexing
 
 ### 序数インデックスはダメ
-配列のインデックスに oridinal() を使ってはいけない
+配列のインデックスに ordinal() を使ってはいけない
 
 ```Java
 class Plant {
