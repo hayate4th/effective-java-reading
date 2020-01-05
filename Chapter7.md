@@ -357,7 +357,6 @@ isProbablePrime の引数は素数判定の制御値である。
 ストリームかループのどちらを使用するか確信が持てないときは両方を試してみて調べる。P210 ~P211のソースコード参照。
 
 ## 項目46 ストリームで副作用のない関数を選ぶ
-ストリームの考え方で最も重要な部分は、計算を変換のシーケンスとして構築することである。
 
 テキストファイル内の単語の頻度表を構築するプログラムを考える
 ```java
@@ -400,10 +399,12 @@ List<String> topTen = freq.keySet().stream()
     .collect(toList());
 ```
 
-toList() メソッドを Collectorsで修飾していないのは、ストリームパイプラインの可読性を上げるために Collectors すべてのメンバーを static インポートするのが慣習だからである。
+Collectors.toList() と書かないのは、ストリームパイプラインの可読性を上げるために Collectors すべてのメンバーを static インポートするのが慣習だからである。
 
 comparing は、型TからComparableソート・キーを抽出する関数を受け取り、そのソート・キーで比較するComparator<T>を返す。
+
 各ストリーム要素はキーと値に関連付けられ、複数のストリーム要素を同一のキーに関連付けることができる。
+
 最も単純なマップのコレクターの使用例として、以下に文字列から enum へのマップを作成するtoMapコレクターを使用したプログラムを示す。
 
 ```java
@@ -423,9 +424,44 @@ groupingBy および toMap はこのような衝突を回避するための手�
 Map<Artist, Album> topHits = album.collect(toMap(Album::artist, a->a, maxBy(comparing(Album::sales))));
 ```
 
-maxBy は最大要素を生成するCollectorを返す。
+※ maxBy は最大要素を生成するCollectorを返す。
 
 以下は衝突があるときに、最後の書き込みを優先するコレクターのプログラムである。
 ```java
 toMap(keyMapper, valueMapper, (oldValue, newValue) -> newValue)
 ```
+
+groupingBy はキーに対応するリストのマップを生成する
+
+```java
+List<Integer> nums = List.of(1,2,3,4,5,6,7,8,9,1,1,1);
+Map<Integer, Long> map = nums.stream().collect(Collectors.groupingBy(i ->i));
+System.out.println(map);
+
+=> {1=[1, 1, 1, 1], 2=[2], 3=[3], 4=[4], 5=[5], 6=[6], 7=[7], 8=[8], 9=[9]}
+```
+
+[後世まで残したいCollectors.groupingByの話](https://qiita.com/tasogarei/items/5492e09b78f6bfc98801)
+
+groupingBy にリスト以外の値を持つマップを生成する Collector を返すようにしたいときは、`ダウンストリームコレクター`を指定する。
+groupingBy メソッドの場合は、第2引数にダウンストリームコレクターを指定する。
+
+```java
+List<Integer> nums = List.of(1,2,3,4,5,6,7,8,9,1,1,1);
+Map<Integer, Long> map = nums.stream().collect(Collectors.groupingBy(i ->i, Collectors.counting()));
+System.out.println(map);
+
+=> {1=4, 2=1, 3=1, 4=1, 5=1, 6=1, 7=1, 8=1, 9=1}
+```
+
+counting メソッドが返す Collector はダウンストリームコレクターとして利用されることを想定しているため、 Stream の count メソッドを使っても同じことができる。
+
+```java
+Stream.count() <=> Stream.collect(counting())
+```
+
+Collectors のメソッドには、他にも maxBy, minBy, joining, summing, averaging, summarizing で始まるメソッドが存在する → [Collectorsクラス](https://docs.oracle.com/javase/jp/8/docs/api/java/util/stream/Collectors.html)
+
+#### まとめ
+- 終端操作 forEach はストリームによって行われた計算結果を表示するためだけに使われるべき。
+- ストリームをコレクションに変換するために Collector を使う。場合によってはダウンストリームコレクターを使う。
