@@ -465,3 +465,34 @@ Collectors のメソッドには、他にも maxBy, minBy, joining, summing, ave
 #### まとめ
 - 終端操作 forEach はストリームによって行われた計算結果を表示するためだけに使われるべき。
 - ストリームをコレクションに変換するために Collector を使う。場合によってはダウンストリームコレクターを使う。
+
+## 項目47 戻り値型として Stream よりも Collection を選ぶ
+Streamが登場する前は Collection, Set, List, Iterable, 配列型、どれを戻り値として返すか決めるのは簡単だった。基本的にコレクションのインタフェースを返すのが普通であり、
+Collection のメソッドを実装できない場合は Iterable インタフェースが使用された。基本データ型を扱う場合や、厳しいパフォーマンス制約がある場合は配列型が使用された。ところが、Streamが追加されたことによって返り値を決めるのが難しくなってしまった。
+
+例えば、戻り値として Stream を選択した場合、forEachメソッドを使うことはできない。Stream は Iterable のメソッドと互換性があるため、Iteratorを使ってforEachを実装することはできる
+
+```java
+public static <E> Iterable<E> iterableOf(Stream<E> stream) {
+    return stream::iterator();
+}
+
+~~~
+for (ProcessHandle ph : iterableOf(ProcessHandle.allProcesses())) {
+    // プロセスを処理する
+}
+```
+
+以下の実装だと、コンパイルエラーになったり、人間が読みにくい実装になってしまう。
+
+```java
+for (ProcessHandle ph : ProcessHandle.allProcesses()::iterator) { // エラー：　ここではメソッド参照は予期されていません
+
+for (ProcessHandle ph : (Iterable<ProcessHandle>) ProcessHandle.allProcesses()::iterator) // キャストすれば動作するけど複雑になる
+```
+
+項目45の Anagram プログラムでは Files.lines を使っているが、ループを使ったプログラムでは Scanner を使っている。Scannerを使用したのは、File.lines() の戻り値がストリームだからである。
+
+オブジェクトのシーケンスを返すメソッドを書いていて、それがストリームパイプラインでしか使われないのであればストリームを返すべきである。また、ループでしか使われないのであれば Iterable を返すべきである。
+だが、理想的にはストリームパイプライン、for-each文を書きたいユーザーどちらにも備えるべきであり、Collectionインタフェースは Iterable のサブタイプで、streamメソッドを持っているので、`一般的に Collection、もしくはそのサブタイプを戻り値として返す`とよい。
+
