@@ -470,7 +470,7 @@ Collectors のメソッドには、他にも maxBy, minBy, joining, summing, ave
 Streamが登場する前は Collection, Set, List, Iterable, 配列型、どれを戻り値として返すか決めるのは簡単だった。基本的にコレクションのインタフェースを返すのが普通であり、
 Collection のメソッドを実装できない場合は Iterable インタフェースが使用された。基本データ型を扱う場合や、厳しいパフォーマンス制約がある場合は配列型が使用された。ところが、Streamが追加されたことによって返り値を決めるのが難しくなってしまった。
 
-例えば、戻り値として Stream を選択した場合、forEachメソッドを使うことはできない。Stream は Iterable のメソッドと互換性があるため、Iteratorを使ってforEachを実装することはできる
+例えば、戻り値として Stream を選択した場合、for-each文を使うことはできない。Stream は Iterable のメソッドと互換性があるため、Iteratorを使ってforEachを実装することはできる
 
 ```java
 public static <E> Iterable<E> iterableOf(Stream<E> stream) {
@@ -495,4 +495,28 @@ for (ProcessHandle ph : (Iterable<ProcessHandle>) ProcessHandle.allProcesses()::
 
 オブジェクトのシーケンスを返すメソッドを書いていて、それがストリームパイプラインでしか使われないのであればストリームを返すべきである。また、ループでしか使われないのであれば Iterable を返すべきである。
 だが、理想的にはストリームパイプライン、for-each文を書きたいユーザーどちらにも備えるべきであり、Collectionインタフェースは Iterable のサブタイプで、streamメソッドを持っているので、`一般的に Collection、もしくはそのサブタイプを戻り値として返す`とよい。
+
+ただし、`コレクションを返すためだけに大きなシーケンスをメモリに保存しない`ようにする。
+
+入力セットのべき集合をコレクションとして返すプログラムを考える（p.219参照）
+
+入力セットを30個に制限することで、シーケンスの長さをInteger.MAX_VALUEを超えないようにしている。
+
+指数ほどの大きさではないが、入力値のリストの大きさのn倍の量のメモリが必要なケースについて考える（p.220参照）
+
+入力リストのサブリストのストリームを実装するのは容易である。
+
+メモ：range/rangeClosedの違い
+```java
+IntStream.range(0,5).forEach(System.out::print);
+System.out.println("");
+IntStream.rangeClosed(0,5).forEach(System.out::print);
+
+=> 01234
+=> 012345
+```
+
+### まとめ
+- ユーザーはストリームとして処理したいかもしれないし、for-each文でループを回したいかもしれない。だから Streamへの変換が容易なコレクションを返す。ストリームパイプラインを使用することしか想定していない場合は Stream を返す。
+- シーケンスの要素数が多くなる場合はコレクションの実装を検討する。
 
