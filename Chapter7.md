@@ -520,3 +520,10 @@ IntStream.rangeClosed(0,5).forEach(System.out::print);
 - ユーザーはストリームとして処理したいかもしれないし、for-each文でループを回したいかもしれない。だから Streamへの変換が容易なコレクションを返す。ストリームパイプラインを使用することしか想定していない場合は Stream を返す。
 - シーケンスの要素数が多くなる場合はコレクションの実装を検討する。
 
+# 項目48 ストリームを並列化するときは注意を払う
+ストリームでは parallel メソッドを一度呼び出すだけで並列化できる。
+だが、ストリームの並列実行はオーバーヘッドが大きく、パフォーマンスが向上する状況は限られている。
+reduce, min, max, count, sumといったリダクション操作、もしくはanyMatch, allMatch, noneMatchのような短絡操作であれば並列化による恩恵を受けられる。
+
+(ストリームAPI やさしい並列処理【Java】)[https://qiita.com/s_moteki/items/9e81ce74cc0a3ce7a628]
+
