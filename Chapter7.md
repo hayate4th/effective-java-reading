@@ -435,7 +435,7 @@ groupingBy はキーに対応するリストのマップを生成する
 
 ```java
 List<Integer> nums = List.of(1,2,3,4,5,6,7,8,9,1,1,1);
-Map<Integer, Long> map = nums.stream().collect(Collectors.groupingBy(i ->i));
+Map<Integer, List<Long>> map = nums.stream().collect(Collectors.groupingBy(i ->i));
 System.out.println(map);
 
 => {1=[1, 1, 1, 1], 2=[2], 3=[3], 4=[4], 5=[5], 6=[6], 7=[7], 8=[8], 9=[9]}
@@ -528,5 +528,5 @@ IntStream.rangeClosed(0,5).forEach(System.out::print);
 だが、ストリームの並列実行はオーバーヘッドが大きく、パフォーマンスが向上する状況は限られている。
 reduce, min, max, count, sumといったリダクション操作、もしくはanyMatch, allMatch, noneMatchのような短絡操作であれば並列化による恩恵を受けられる。
 
-(ストリームAPI やさしい並列処理【Java】)[https://qiita.com/s_moteki/items/9e81ce74cc0a3ce7a628]
+[ストリームAPI やさしい並列処理【Java】](https://qiita.com/s_moteki/items/9e81ce74cc0a3ce7a628)
 
