@@ -516,6 +516,9 @@ IntStream.rangeClosed(0,5).forEach(System.out::print);
 => 012345
 ```
 
+結果が非常に大きく、一度にすべてを具現化する必要がない場合はStreamを返す。具象化によるヒープ領域不足を回避する。
+参考：https://stackoverflow.com/questions/24676877/should-i-return-a-collection-or-a-stream/24679745#24679745
+
 ### まとめ
 - ユーザーはストリームとして処理したいかもしれないし、for-each文でループを回したいかもしれない。だから Streamへの変換が容易なコレクションを返す。ストリームパイプラインを使用することしか想定していない場合は Stream を返す。
 - シーケンスの要素数が多くなる場合はコレクションの実装を検討する。
